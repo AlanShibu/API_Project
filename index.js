@@ -1,8 +1,15 @@
+require("dotenv").config();
 const express= require("express");
+const mongoose = require("mongoose");
 var bodyParser = require("body-parser");
 
 //Database
-const database= require("./database");
+const database = require("./database/database");
+
+//Models
+const BookModel=require("./database/book");
+const AuthorModel=require("./database/author");
+const PublicationModel=require("./database/publication");
 
 //initialise express
 const booky=express();
@@ -10,6 +17,29 @@ const booky=express();
 booky.use(bodyParser.urlencoded({extended:true}));
 booky.use(bodyParser.json());
 
+mongoose.connect(process.env.MONGO_URL,
+{
+  useNewUrlParser : true ,
+  useUnifiedTopology : true,
+  //useFindAndModify: false,
+  //useCreateIndex: true
+}
+).then(() => console.log("Connection Established!"));
+
+
+/*API Description
+Route        /
+Description  Get all books
+Access       Public
+Parameter    none
+Methods      Get
+*/
+
+booky.get("/",async(req,res) => {
+  const getAllBooks = await BookModel.find();
+  return  res.json(getAllBooks);
+ }
+);
 /*API Description
 Route        /is
 Description  Get specific Books baesd on ISBN number
@@ -18,11 +48,11 @@ Parameter    isbn
 Methods      Get
 */
 
-booky.get("/",(req,res) => {
+/*booky.get("/",(req,res) => {
   return res.json({books:database.books});
 });
 
-booky.get("/is/:isbn",(req,res) => {
+booky.get("/is/:isbn", async(req,res) => {
   const getSpecificBook = database.books.filter(
     (book) => book.ISBN === req.params.isbn
   );
@@ -31,6 +61,17 @@ booky.get("/is/:isbn",(req,res) => {
   }
 
    return res.json({book:getSpecificBook});
+});*/
+
+//using mongodb
+booky.get("/is/:isbn",async(req,res) => {
+  const getSpecificBook= await BookModel.findOne({ISBN:req.params.isbn});
+//null-0!=1 and vice-versa
+  if(!getSpecificBook){
+    return res.json({error:`No book found for the book of ISBN number : ${req.params.isbn}`});
+  }
+
+  return res.json({book:getSpecificBook});
 });
 
 /*API Description
@@ -41,12 +82,14 @@ Parameter    category
 Methods      Get
 */
 
-booky.get("/c/:category", (req,res) => {
+/*booky.get("/c/:category", (req,res) => {
   const getSpecificBook = database.books.filter(
     (book) => book.category.includes(req.params.category) //includes() function is used to check whether an array contains a specific element;here,category is an array with multiple elements;so to compare each element, we use includes
-  )
+  )*/
+booky.get("/ca/:category",async(req,res) => {
+  const getSpecificBook= await BookModel.findOne({category:req.params.category});
 
-  if(getSpecificBook. length=== 0)
+  if(!getSpecificBook)
   {
     return res.json({error:`No book found for the given category of ${req.params.category}`})
   }
@@ -84,8 +127,9 @@ Parameter    None
 Methods      Get
 */
 
-booky.get(("/author"),(req,res) => {
-  return res.json({authors:database.author})
+booky.get(("/author"),async(req,res) => {
+  const getAllAuthors =  await AuthorModel.find();
+  return res.json(getAllAuthors)
 })
 
 /*API Description
@@ -115,7 +159,7 @@ Parameter    isbn
 Methods      Get
 */
 
-  booky.get("/author/book/:isbn",(req,res) => {
+  /*booky.get("/author/book/:isbn",(req,res) => {
      const getSpecificAuthor = database.author.filter(
        (author) => (author.books.includes(req.params.isbn))
   )
@@ -125,6 +169,18 @@ Methods      Get
   }
 
   return res.json({author:getSpecificAuthor});
+});*/
+
+
+//using mongodb
+booky.get("/c/:category",async(req,res) => {
+  const getSpecificBook= await BookModel.findOne({category:req.params.category});
+
+  if(!getSpecificBook){
+    return res.json({error:`No book found for the book of category : ${req.params.category}`});
+  }
+
+  return res.json({book:getSpecificBook});
 });
 
 /*API Descriptions
@@ -135,8 +191,9 @@ Parameter    None
 Methods      Get
 */
 
-booky.get("/publications",(req,res) => {
-  return res.json({publications:database.publication});
+booky.get("/publications",async(req,res) => {
+  const getAllPublications = await PublicationModel.find();
+  return res.json(getAllPublications);
 })
 
 /*API Description
@@ -169,16 +226,42 @@ Access       Public
 Parameter    none
 Methods      post
 */
+//destructuring required
+ booky.post("/book/new",async(req,res) =>{
+   const { newBook} =  req.body;
+   const addNewBook =  BookModel.create(newBook);
+   return res.json({
+     books: addNewBook,
+     message: "Book was added!!"
+   });
+ });
 
-booky.post("/book/new",(req,res) => {
+/*booky.post("/book/new",(req,res) => {
   const newBook = req.body;
   database.books.push(newBook);
   return res.json({updatedBooks:database.books});
 });
 
 /*API Description
+Route        /author/new
+Description  Add new author
+Access       Public
+Parameter    none
+Methods      post
+*/
+
+booky.post("/author/new",async(req,res) =>{
+  const { newAuthor} = req.body; //destructuring
+  const addNewAuthor  = AuthorModel.create(newAuthor);
+  return res.json({
+     author:addNewAuthor,
+     message: "New author added successfully!"
+  });
+});
+
+/*API Description
 Route        /publication/new
-Description  Add new publication
+Description  Add new author
 Access       Public
 Parameter    none
 Methods      post
@@ -189,6 +272,31 @@ booky.post("/author/new",(req,res) => {
   database.author.push(newAuthor);
   return res.json({updatedAuthor:database.author});
 })
+
+/*API Description
+Route        /publication/new
+Description  Add new publication
+Access       Public
+Parameter    none
+Methods      post
+*/
+
+booky.post("/publication/new", async(req,res) =>{
+  const {newPublication}= req.body;
+  const addNewPublication = PublicationModel.create(newPublication);
+  return res.json({
+    publication:addNewPublication,
+    message:"New publication added successfully!"
+  });
+});
+
+/*API Description
+Route        /publication/new
+Description  Add new publication
+Access       Public
+Parameter    none
+Methods      post
+*/
 
 /*API Description
 Route        /publication/new
@@ -301,6 +409,8 @@ booky.delete("/book/delete/author/:isbn/:authorId",(req,res) => {
     author:database.author,
    message:"Author was deleted"
  });
+
+
 });
 booky.listen(3000, () => {
   console.log("Server 3000 is up and running ");
